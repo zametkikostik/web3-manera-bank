@@ -1,0 +1,22 @@
+{
+  "name": "web3-bank-monera",
+  "version": "1.0.0",
+  "description": "Web3 Bank with DeFi integration and AI",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd backend && npm run dev",
+    "client": "cd frontend && npm start",
+    "mobile": "cd mobile && npm start",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../mobile && npm install"
+  },
+  "keywords": ["bank", "web3", "defi", "blockchain", "ai"],
+  "author": "Web3 Bank Monera",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
