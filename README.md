@@ -57,7 +57,7 @@
 
 ### 1. Клонирование репозитория
 ```bash
-git clone https://github.com/your-repo/web3-bank-monera.git
+git clone https://github.com/zametkikostik/web3-bank-monera.git
 cd web3-bank-monera
 ```
 
