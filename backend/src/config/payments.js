@@ -1,5 +1,6 @@
 const Stripe = require('stripe');
 const axios = require('axios');
+const crypto = require('crypto');
 const logger = require('../utils/logger');
 
 let stripe;
@@ -19,6 +20,7 @@ const setupPayments = async () => {
       paymentProviders.yumoney = {
         clientId: process.env.YUMONEY_CLIENT_ID,
         clientSecret: process.env.YUMONEY_CLIENT_SECRET,
+        walletId: process.env.YUMONEY_WALLET_ID,
         baseUrl: 'https://yoomoney.ru'
       };
       logger.info('✅ ЮMoney initialized');
@@ -29,7 +31,8 @@ const setupPayments = async () => {
       paymentProviders.payeer = {
         merchantId: process.env.PAYEER_MERCHANT_ID,
         apiKey: process.env.PAYEER_API_KEY,
-        baseUrl: 'https://payeer.com'
+        apiSecret: process.env.PAYEER_API_SECRET,
+        baseUrl: 'https://payeer.com/api/merchant'
       };
       logger.info('✅ Payeer initialized');
     }
@@ -39,7 +42,7 @@ const setupPayments = async () => {
       paymentProviders.icard = {
         merchantId: process.env.ICARD_MERCHANT_ID,
         apiKey: process.env.ICARD_API_KEY,
-        baseUrl: 'https://icard.com'
+        baseUrl: 'https://icard.com/api/v1'
       };
       logger.info('✅ iCard initialized');
     }
@@ -122,52 +125,59 @@ const processYumoneyPayment = async (paymentData) => {
 const processPayeerPayment = async (paymentData) => {
   const { amount, currency, description } = paymentData;
   
-  const crypto = require('crypto');
+  if (!paymentProviders.payeer) {
+    throw new Error('Payeer provider not initialized');
+  }
+
   const orderId = `MNR_${Date.now()}`;
+  const signString = `${paymentProviders.payeer.merchantId}:${amount}:${currency}:${orderId}:${paymentProviders.payeer.apiSecret}`;
   
-  const params = {
-    m_shop: paymentProviders.payeer.merchantId,
-    m_orderid: orderId,
-    m_amount: amount,
-    m_curr: currency,
-    m_desc: Buffer.from(description).toString('base64'),
-    m_sign: crypto
-      .createHash('sha256')
-      .update(`${paymentProviders.payeer.merchantId}:${amount}:${currency}:${paymentProviders.payeer.apiKey}`)
-      .digest('hex')
-      .toUpperCase()
-  };
+  const sign = crypto
+    .createHash('sha256')
+    .update(signString)
+    .digest('hex')
+    .toUpperCase();
 
   return {
-    paymentUrl: `${paymentProviders.payeer.baseUrl}/merchant/`,
-    params
+    paymentUrl: `${paymentProviders.payeer.baseUrl}/init`,
+    params: {
+      merchantId: paymentProviders.payeer.merchantId,
+      orderId,
+      amount,
+      currency,
+      description: Buffer.from(description).toString('base64'),
+      sign
+    }
   };
 };
 
 const processIcardPayment = async (paymentData) => {
   const { amount, currency, description, returnUrl } = paymentData;
   
-  const crypto = require('crypto');
+  if (!paymentProviders.icard) {
+    throw new Error('iCard provider not initialized');
+  }
+
   const orderId = `MNR_${Date.now()}`;
+  const signString = `${paymentProviders.icard.merchantId}${orderId}${amount}${currency}`;
   
-  const signature = crypto
+  const sign = crypto
     .createHmac('sha256', paymentProviders.icard.apiKey)
-    .update(`${paymentProviders.icard.merchantId}${amount}${currency}`)
+    .update(signString)
     .digest('hex');
 
-  const params = {
-    merchant_id: paymentProviders.icard.merchantId,
-    order_id: orderId,
-    amount: amount,
-    currency: currency,
-    description: description,
-    return_url: returnUrl,
-    signature: signature
-  };
-
   return {
-    paymentUrl: `${paymentProviders.icard.baseUrl}/payment/`,
-    params
+    paymentUrl: `${paymentProviders.icard.baseUrl}/payments/create`,
+    params: {
+      merchant_id: paymentProviders.icard.merchantId,
+      order_id: orderId,
+      amount,
+      currency,
+      description,
+      return_url: returnUrl,
+      signature: sign,
+      sandbox: process.env.ICARD_SANDBOX === 'true'
+    }
   };
 };
 
